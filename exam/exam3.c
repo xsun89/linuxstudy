@@ -1,17 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <errno.h>
 #include <signal.h>
 #include <unistd.h>
-#include <sys/socket.h>
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <bootstrap.h>
 #include <sys/wait.h>
-#include <stddef.h>
 
 int pidarray[10];
 void myhandle(int num, siginfo_t *st, void *p)
@@ -26,15 +19,15 @@ int main()
 
     act.sa_flags = SA_SIGINFO;
     act.sa_sigaction = myhandle;
-    if(sigaction(SIGINFO, &act, NULL) < 0)
+    if(sigaction(SIGRTMIN+1, &act, NULL) < 0)
     {
         perror("sigaction failed");
     }
-    if(sigaction(SIGUSR1, &act, NULL) < 0)
+    if(sigaction(SIGRTMIN+2, &act, NULL) < 0)
     {
         perror("sigaction2 failed");
     }
-    if(sigaction(SIGUSR2, &act, NULL) < 0)
+    if(sigaction(SIGRTMIN+3, &act, NULL) < 0)
     {
         perror("sigaction3 failed");
     }
@@ -63,8 +56,8 @@ int main()
     {
         printf("parent \n");
     }
-    int childpid = 10;
-    while((childpid = wait(NULL)) > 0)
+    int childpid;
+    while((childpid = waitpid(-1, NULL, WNOHANG)) >= 0)
     {
         printf("child pid:%d ended\n", childpid);
     }

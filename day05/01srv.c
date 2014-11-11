@@ -12,7 +12,7 @@
 int main()
 {
     int sockfd = 0;
-    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if(sockfd < 0)
     {
         perror("func sock");
@@ -25,15 +25,16 @@ int main()
     memset(&inAddr, 0, sizeof(inAddr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(8008);
-    inet_aton("120.0.0.1", &inAddr);
-    addr.sin_addr = inAddr;
+    //inet_aton("192.168.30.188", &inAddr);
+    addr.sin_addr.s_addr = inet_addr("192.168.30.188");
 
     if(bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
     {
         perror("func bind");
         exit(0);
     }
-    if(listen(sockfd, SOMAXCONN) < 0)
+    
+    if(listen(sockfd, 5) < 0)
     {
         perror("func listen");
         exit(0);
@@ -42,7 +43,7 @@ int main()
     struct sockaddr_in peerAddr;
     socklen_t peerAddrLen = sizeof(peerAddr);
     int conn = 0;
-    if((conn = accept(sockfd, (struct sockaddr *)&peerAddr, (socklen_t *)&peerAddrLen)))
+    if((conn = accept(sockfd, (struct sockaddr *)&peerAddr, (socklen_t *)&peerAddrLen)) < 0)
     {
         perror("func accept");
         exit(0);
@@ -64,5 +65,8 @@ int main()
         fputs(buf, stdout);
         write(conn, buf, sizeof(buf));
     }
+
+    close(conn);
+    close(sockfd);
     return 0;
 }

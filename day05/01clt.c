@@ -12,7 +12,7 @@
 int main()
 {
     int sockfd = 0;
-    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if(sockfd < 0)
     {
         perror("func sock");

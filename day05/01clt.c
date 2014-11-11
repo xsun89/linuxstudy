@@ -25,7 +25,7 @@ int main()
     memset(&inAddr, 0, sizeof(inAddr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(8008);
-    inet_aton("192.168.30.188", &inAddr);
+    inet_aton("127.0.0.1", &inAddr);
     addr.sin_addr = inAddr;
     
     if(connect(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0)

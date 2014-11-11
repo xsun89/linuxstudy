@@ -9,6 +9,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <bootstrap.h>
+
 int main()
 {
     int sockfd = 0;
@@ -26,8 +28,13 @@ int main()
     addr.sin_family = AF_INET;
     addr.sin_port = htons(8008);
     //inet_aton("192.168.30.188", &inAddr);
-    addr.sin_addr.s_addr = inet_addr("192.168.30.188");
-
+    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    int optionVal = 1;
+    if(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (void *)&optionVal, sizeof(optionVal)) < 0)
+    {
+        perror("setsockopt");
+        exit(0);
+    }
     if(bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
     {
         perror("func bind");
@@ -43,29 +50,35 @@ int main()
     struct sockaddr_in peerAddr;
     socklen_t peerAddrLen = sizeof(peerAddr);
     int conn = 0;
-    if((conn = accept(sockfd, (struct sockaddr *)&peerAddr, (socklen_t *)&peerAddrLen)) < 0)
-    {
-        perror("func accept");
-        exit(0);
-    }
-    printf("peer address:%s \t peerport:%d\n", inet_ntoa(peerAddr.sin_addr), ntohs(peerAddr.sin_port));
-    char buf[1024] = {0};
     while(1)
     {
-        int ret = read(conn, buf, sizeof(buf));
-        if(ret == 0)
-        {
-            printf("peer reset");
+        if ((conn = accept(sockfd, (struct sockaddr *) &peerAddr, (socklen_t * ) & peerAddrLen)) < 0) {
+            perror("func accept");
             exit(0);
-        }else if(ret < 0)
-        {
-            perror("read fail");
         }
+        printf("peer address:%s \t peerport:%d\n", inet_ntoa(peerAddr.sin_addr), ntohs(peerAddr.sin_port));
+        char buf[1024] = {0};
+        pid_t pid = fork();
+        if(pid == 0)
+        {
+            close(sockfd);
+            while (1) {
+                int ret = read(conn, buf, sizeof(buf));
+                if (ret == 0) {
+                    printf("peer reset");
+                    exit(0);
+                } else if (ret < 0) {
+                    perror("read fail");
+                }
 
-        fputs(buf, stdout);
-        write(conn, buf, sizeof(buf));
+                fputs(buf, stdout);
+                write(conn, buf, sizeof(buf));
+            }
+        }else if(pid > 0)
+        {
+            close(conn);
+        }
     }
-
     close(conn);
     close(sockfd);
     return 0;

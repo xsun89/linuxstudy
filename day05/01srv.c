@@ -9,7 +9,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <bootstrap.h>
 
 int main()
 {
@@ -66,6 +65,7 @@ int main()
                 int ret = read(conn, buf, sizeof(buf));
                 if (ret == 0) {
                     printf("peer reset");
+					close(conn);
                     exit(0);
                 } else if (ret < 0) {
                     perror("read fail");

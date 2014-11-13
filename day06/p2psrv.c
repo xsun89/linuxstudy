@@ -12,10 +12,68 @@
 #include <bootstrap.h>
 #include <signal.h>
 #include <sys/signal.h>
+#include <search.h>
+#include <GSS/GSS.h>
+#include <ForceFeedback/ForceFeedback.h>
+#include <Python/Python.h>
+#include <Kernel/string.h>
+#include <stddef.h>
+
 void handler(int num)
 {
     printf("parent received signal\n");
     exit(0);
+}
+
+ssize_t writen(int fd, const void *buf, size_t len)
+{
+    size_t nleft = len;
+    ssize_t nwritten = 0;
+    char *tmpBuf = (char *)buf;
+    while(nleft >0)
+    {
+        nwritten = write(fd, tmpBuf, nleft);
+        if(nwritten < 0)
+        {
+            if(errno == ENTER)
+                continue;
+            return -1;
+        }else if(nwritten == 0)
+        {
+            continue;
+        }
+        tmpBuf = tmpBuf + nwritten;
+        nleft -= nwritten;
+    }
+
+    return len;
+}
+
+ssize_t readn(int fd, void *buf, size_t len)
+{
+    size_t nleft = len;
+    ssize_t nread = 0;
+    char *tmpBuf = (char *)buf;
+    while(nleft >0)
+    {
+        nread = write(fd, tmpBuf, nleft);
+        if(nread < 0)
+        {
+            if(errno == ENTER) {
+                continue;
+            }else {
+                return -1;
+            }
+        }else if(nread == 0)
+        {
+            return len-nleft;
+        }
+        tmpBuf = tmpBuf + nread;
+        nleft -= nread;
+    }
+
+    return len;
+
 }
 int main()
 {
@@ -66,16 +124,22 @@ int main()
     if(pid == 0)
     {
         char buf[1024] = {0};
+        int buflen = 0;
         while (1) {
-            int ret = read(conn, buf, sizeof(buf));
-            if (ret == 0) {
+            buflen = readn(conn, buf, 4);
+            if (buflen == 0) {
                 printf("peer reset");
                 break;
-            } else if (ret < 0) {
+            } else if (buflen < 0) {
                 perror("read fail");
                 break;
+            }else if(buflen != 4)
+            {
+                break;
             }
-
+            int actLen = (int)buf;
+            memset(buf, 0, sizeof(buf));
+            buflen = readn(conn, buf, actLen);
             fputs(buf, stdout);
             memset(buf, 0, sizeof(buf));
         }
@@ -87,8 +151,11 @@ int main()
     if(pid > 0)
     {
         char sendbuf[1024] = {0};
+        int sendbufLen = 0;
         while(fgets(sendbuf, sizeof(sendbuf), stdin) != NULL) {
-            write(conn, sendbuf, sizeof(sendbuf));
+            sendbufLen = strlen(sendbuf);
+            write(conn, (void *)sendbufLen, 4);
+            write(conn, sendbuf, sendbufLen);
             memset(sendbuf, 0, sizeof(sendbuf));
         }
     }

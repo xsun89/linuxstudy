@@ -9,12 +9,69 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <sys/signal.h>
+
+typedef struct _data
+{
+    int buflen;
+    char buf[1024];
+}data;
+
 
 void handler(int num)
 {
     printf("child received signal\n");
     exit(0);
+}
+
+ssize_t writen(int fd, const void *buf, size_t len)
+{
+    size_t nleft = len;
+    ssize_t nwritten = 0;
+    char *tmpBuf = (char *)buf;
+    while(nleft >0)
+    {
+        nwritten = write(fd, tmpBuf, nleft);
+        if(nwritten < 0)
+        {
+            if(errno == EINTR)
+                continue;
+            return -1;
+        }else if(nwritten == 0)
+        {
+            continue;
+        }
+        tmpBuf = tmpBuf + nwritten;
+        nleft -= nwritten;
+    }
+
+    return len;
+}
+
+ssize_t readn(int fd, void *buf, size_t len)
+{
+    size_t nleft = len;
+    ssize_t nread = 0;
+    char *tmpBuf = (char *)buf;
+    while(nleft >0)
+    {
+        nread = read(fd, tmpBuf, nleft);
+        if(nread < 0)
+        {
+            if(errno == EINTR) {
+                continue;
+            }else {
+                return -1;
+            }
+        }else if(nread == 0)
+        {
+            return len-nleft;
+        }
+        tmpBuf = tmpBuf + nread;
+        nleft -= nread;
+    }
+
+    return len;
+
 }
 int main()
 {
@@ -35,7 +92,6 @@ int main()
     addr.sin_port = htons(8008);
     inet_aton("127.0.0.1", &inAddr);
     addr.sin_addr = inAddr;
-    
     if(connect(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
     {
         perror("func connect");
@@ -44,27 +100,44 @@ int main()
     pid_t pid = fork();
     if(pid == 0)
     {
-        char sendbuf[1024] = {0};
-        while(fgets(sendbuf, sizeof(sendbuf), stdin) != NULL) {
-            write(sockfd, sendbuf, sizeof(sendbuf));
-            memset(sendbuf, 0, sizeof(sendbuf));
+        data d;
+        memset(&d, 0, sizeof(d));
+        int n;
+        while(fgets(d.buf, sizeof(d.buf), stdin) != NULL) {
+            n = strlen(d.buf);
+            d.buflen = htonl(n);
+            printf("client sending length=%d buf=%s\n", n, d.buf);
+            writen(sockfd, (void *)&d, 4+n);
+            memset(&d, 0, sizeof(d));
         }
     }
 
     if(pid > 0)
     {
-        char recvbuf[1024] = {0};
-        while(1) {
-            int ret = read(sockfd, recvbuf, sizeof(recvbuf));
-            if (ret == 0) {
-                printf("peer reset");
+        data d;
+        memset(&d, 0, sizeof(d));
+        int readlen;
+        while (1) {
+            readlen = readn(sockfd, (void *)&d.buflen, 4);
+            if (readlen == 0) {
+                printf("server reset");
                 break;
-            } else if (ret < 0) {
+            } else if (readlen < 0) {
                 perror("read fail");
                 break;
             }
-            fputs(recvbuf, stdout);
-            memset(recvbuf, 0, sizeof(recvbuf));
+            int actlen = ntohl((int)d.buflen);
+            printf("client read actual length=%d\n", actlen);
+            readlen = readn(sockfd, (void *)d.buf, actlen);
+            if (readlen == 0) {
+                printf("peer reset");
+                break;
+            } else if (readlen < 0) {
+                perror("read fail");
+                break;
+            }
+            fputs(d.buf, stdout);
+            memset(&d, 0, sizeof(d));
         }
         close(sockfd);
         kill(pid, SIGUSR1);

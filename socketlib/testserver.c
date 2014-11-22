@@ -28,34 +28,36 @@ int main()
         printf("sckServer_init() err:%d\n", ret);
         return ret;
     }
-    int connfd = 0;
-    ret = sckServer_accept(listenfd, &connfd, 5);
-    if(ret == SCK_ERRTIMEOUT){
-        printf("timeout...\n");
-    }
-    int pid = fork();
-    if(pid == 0){
-        unsigned char recvbuf[1024];
-        int recvbuflen = 1024;
-        close(listenfd);
-        while(1){
-            memset(recvbuf, 0, sizeof(recvbuf));
-            ret = sckServer_rcv(connfd, recvbuf, &recvbuflen, 5);
-            if(ret != 0){
-                printf("func sckServer_recv() err:%d\n", ret);
-                break;
-            }
-            ret = sckServer_send(connfd, recvbuf, recvbuflen, 6);
-            if(ret != 0){
-                printf("func sckServer_send() err:%d\n", ret);
-                break;
-            }
+    while(1) {
+        int connfd = 0;
+        ret = sckServer_accept(listenfd, &connfd, 5);
+        if (ret == SCK_ERRTIMEOUT) {
+            printf("timeout...\n");
+            continue;
         }
-        close(connfd);
-        exit(ret);
-    }else if(pid > 0){
-        close(connfd);
+        int pid = fork();
+        if (pid == 0) {
+            unsigned char recvbuf[1024];
+            int recvbuflen = 1024;
+            close(listenfd);
+            while (1) {
+                memset(recvbuf, 0, sizeof(recvbuf));
+                ret = sckServer_rcv(connfd, recvbuf, &recvbuflen, 5);
+                if (ret != 0) {
+                    printf("func sckServer_recv() err:%d\n", ret);
+                    break;
+                }
+                ret = sckServer_send(connfd, recvbuf, recvbuflen, 6);
+                if (ret != 0) {
+                    printf("func sckServer_send() err:%d\n", ret);
+                    break;
+                }
+            }
+            close(connfd);
+            exit(ret);
+        } else if (pid > 0) {
+            close(connfd);
+        }
     }
-
     return ret;
 }

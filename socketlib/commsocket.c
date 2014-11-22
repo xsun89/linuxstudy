@@ -300,7 +300,7 @@ int sckClient_init(void **handle, int connTime, int sendTime, int recvTime, int 
     tmp->sendtime = sendTime;
     tmp->recvtime = recvTime;
     int sockfd;
-    sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if(sockfd < 0)
     {
         ret = errno;
@@ -317,7 +317,7 @@ int sckClient_connect(void *handle, const char *ip, int port)
     int ret = 0;
     if(handle == NULL || ip == NULL || port <0 || port > 61350){
         ret = SCK_ERRPARM;
-        printf("func sckClient_init() err\n");
+        printf("func sckClien_connect() err\n");
         return ret;
     }
 
@@ -348,6 +348,7 @@ int sckClient_send(void *handle, unsigned char *data, int datalen)
     int ret = 0;
     SckHandle *tmp = handle;
     ret = write_timeout(tmp->sockfd, tmp->sendtime);
+    printf("sckClient_send() write_timeout ret=%d\n", ret);
     if(ret == 0){
         int netDataLen = htonl(datalen);
         char *buf = malloc(4+datalen);

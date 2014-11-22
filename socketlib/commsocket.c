@@ -12,14 +12,6 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
-#include <IOKit/IODataQueueClient.h>
-#include <sys/_types/_socklen_t.h>
-#include <bootstrap.h>
-#include <IOKit/IOCFPlugIn.h>
-#include <curses.h>
-#include <sys/_types/_timeval.h>
-#include <GSS/GSS.h>
-#include <ForceFeedback/ForceFeedback.h>
 #include "commsocket.h"
 
 typedef struct _SckHandle
@@ -291,7 +283,7 @@ int sckClient_init(void **handle, int connTime, int sendTime, int recvTime, int 
     if(handle == NULL || connTime < 0 || sendTime < 0 || recvTime < 0 )
     {
         ret = SCK_ERRPARM;
-        printf("func sckClient_init() err\n");
+        printf("func sckClient_init() err: para%d\n", ret);
         return ret;
     }
 
@@ -315,7 +307,7 @@ int sckClient_init(void **handle, int connTime, int sendTime, int recvTime, int 
         return ret;
     }
     tmp->sockfd = sockfd;
-
+	*handle = tmp;
     return ret;
 }
 
@@ -410,22 +402,22 @@ int sckClient_rcv(void *handle, unsigned char *out, int *outlen)
     int netdatalen = 0;
     ret = readn(tmp->sockfd, &netdatalen, 4);
     if(ret == -1 ){
-        printf("func sckClient_rcv() err: %d\n", ret);
+        printf("func sckClient_rcv() first err: %d\n", ret);
         return ret;
     }else if(ret < 4){
         ret = SCK_ERRPEERCLOSED;
-        printf("func sckClient_rcv() err: %d\n", ret);
+        printf("func sckClient_rcv() first err: %d\n", ret);
         return ret;
     }
     int n;
     n = ntohl(netdatalen);
     ret = readn(tmp->sockfd, out, n);
     if(ret == -1 ){
-        printf("func sckClient_rcv() err: %d\n", ret);
+        printf("func sckClient_rcv() second err: %d\n", ret);
         return ret;
-    }else if(ret < 4){
+    }else if(ret < n){
         ret = SCK_ERRPEERCLOSED;
-        printf("func sckClient_rcv() err: %d\n", ret);
+        printf("func sckClient_rcv() second err: %d\n", ret);
         return ret;
     }
     *outlen = n;
@@ -547,11 +539,12 @@ int sckServer_send(int connfd, unsigned char *data, int datalen, int timeout){
 
 int sckServer_rcv(int connfd, unsigned char *out, int *outlen, int timeout){
     int ret = 0;
+	printf("sckServer_rcv() connfd=%d\n", connfd);
     ret = read_timeout(connfd, timeout);
     if(ret < 0){
         if(ret == -1 && errno == ETIMEDOUT){
             ret = SCK_ERRTIMEOUT;
-            printf("sckServer_rcv() err: %d\n", ret);
+            printf("sckServer_rcv() read timeout err: %d\n", ret);
             return ret;
         }
 
@@ -560,22 +553,22 @@ int sckServer_rcv(int connfd, unsigned char *out, int *outlen, int timeout){
     int netdatalen = 0;
     ret = readn(connfd, &netdatalen, 4);
     if(ret == -1 ){
-        printf("func sckServer_rcv() err: %d\n", ret);
+        printf("func sckServer_rcv() first err: %d\n", ret);
         return ret;
     }else if(ret < 4){
         ret = SCK_ERRPEERCLOSED;
-        printf("func sckServer_rcv() err: %d\n", ret);
+        printf("func sckServer_rcv() first err: %d\n", ret);
         return ret;
     }
     int n;
     n = ntohl(netdatalen);
     ret = readn(connfd, out, n);
     if(ret == -1 ){
-        printf("func sckServer_rcv() err: %d\n", ret);
+        printf("func sckServer_rcv() second err: %d\n", ret);
         return ret;
-    }else if(ret < 4){
+    }else if(ret < n){
         ret = SCK_ERRPEERCLOSED;
-        printf("func sckServer_rcv() err: %d\n", ret);
+        printf("func sckServer_rcv() second err: %d\n", ret);
         return ret;
     }
     *outlen = n;

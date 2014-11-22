@@ -12,7 +12,14 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
-#include <Python/Python.h>
+#include <IOKit/IODataQueueClient.h>
+#include <sys/_types/_socklen_t.h>
+#include <bootstrap.h>
+#include <IOKit/IOCFPlugIn.h>
+#include <curses.h>
+#include <sys/_types/_timeval.h>
+#include <GSS/GSS.h>
+#include <ForceFeedback/ForceFeedback.h>
 #include "commsocket.h"
 
 typedef struct _SckHandle
@@ -140,6 +147,42 @@ int connect_timeout(int fd, struct sockaddr *addr, unsigned int wait_seconds)
     }
     return ret;
 }
+
+int accept_timeout(int fd, struct sockaddr *addr, unsigned int wait_seconds){
+    int ret = 0;
+    socklen_t addrlen = sizeof(struct sockaddr);
+    if(wait_seconds > 0){
+        fd_set accept_fdset;
+        struct timeval timeout;
+        FD_ZERO(&accept_fdset);
+        FD_SET(fd, &accept_fdset);
+        timeout.tv_sec = wait_seconds;
+        timeout.tv_usec = 0;
+        do{
+            ret = select(fd+1, &accept_fdset, NULL, NULL, &timeout);
+        }while(ret < 0 && errno == EINTR);
+        if(ret == -1){
+            return -1;
+        }else if(ret == 0){
+            errno = ETIMEDOUT;
+            return -1;
+        }
+    }
+    if(addr != NULL){
+        ret = accept(fd, (struct sockaddr *)addr, &addrlen);
+    }else {
+        ret = accept(fd, NULL, NULL);
+    }
+
+    if(ret == -1){
+        ret = errno;
+        printf("func accept_timeout() err:%d\n", ret);
+        return ret;
+    }
+
+    return ret;
+}
+
 ssize_t writen(int fd, const void *buf, size_t len)
 {
     size_t nleft = len;
@@ -402,6 +445,140 @@ int sckClient_destroy(void *handle)
     if(handle != NULL){
         free(handle);
     }
+
+    return 0;
+}
+
+int sckServer_init(int *listenfd, int port){
+    int ret = 0;
+    int mylistenfd;
+    mylistenfd = socket(PF_INET, SOCK_STREAM, 0);
+    if(mylistenfd < 0){
+        ret = errno;
+        printf("func socket() err:%d\n", ret);
+        return ret;
+    }
+    struct sockaddr_in servaddr;
+    memset(&servaddr, 0, sizeof(servaddr));
+    servaddr.sin_family= AF_INET;
+    servaddr.sin_port= htons(port);
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    int on = 1;
+    ret = setsockopt(mylistenfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+    if(ret <0){
+        ret = errno;
+        printf("func setsockopt() err:%d\n", ret);
+        return ret;
+    }
+    ret = bind(mylistenfd, (struct sockaddr*)&servaddr, sizeof(servaddr));
+    if(ret <0){
+        ret = errno;
+        printf("func bind() err:%d\n", ret);
+        return ret;
+    }
+    ret = listen(mylistenfd, SOMAXCONN);
+    if(ret <0){
+        ret = errno;
+        printf("func listen() err:%d\n", ret);
+        return ret;
+    }
+
+    *listenfd = mylistenfd;
+    return 0;
+}
+int sckServer_accept(int listenfd, int *connfd, int timeout){
+    int ret = 0;
+    ret = accept_timeout(listenfd, NULL, (unsigned int)timeout);
+    if(ret < 0){
+        if(ret == -1 && errno == ETIMEDOUT){
+            ret = SCK_ERRTIMEOUT;
+            printf("func sckServer_accept() timeout err:%d\n", ret);
+            return ret;
+        }else {
+            ret = errno;
+            return ret;
+        }
+    }
+    *connfd = ret;
+    return 0;
+}
+
+int sckServer_send(int connfd, unsigned char *data, int datalen, int timeout){
+    int ret = 0;
+    ret = write_timeout(connfd, timeout);
+    if(ret == 0){
+        int netDataLen = htonl(datalen);
+        char *buf = malloc(4+datalen);
+        if(buf == NULL){
+            ret = SCK_ERRMALLOC;
+            printf("sckServer_send() err: %d\n", ret);
+            return ret;
+        }
+        memcpy(buf, &netDataLen, 4);
+        memcpy(buf+4, data, datalen);
+        int writenLen = writen(connfd, buf, datalen + 4);
+        if(writenLen < datalen + 4){
+            if(buf != NULL){
+                free(buf);
+                buf = NULL;
+                return writenLen;
+            }
+        }
+        if(buf != NULL){
+            free(buf);
+            buf = NULL;
+        }
+        return writenLen;
+    }
+    if(ret < 0)
+    {
+        if(ret == -1 && errno == ETIMEDOUT) {
+            ret = SCK_ERRTIMEOUT;
+            printf("func send() err: %d\n", ret);
+            return ret;
+        }
+
+        return ret;
+    }
+
+    return ret;
+}
+
+int sckServer_rcv(int connfd, unsigned char *out, int *outlen, int timeout){
+    int ret = 0;
+    ret = read_timeout(connfd, timeout);
+    if(ret < 0){
+        if(ret == -1 && errno == ETIMEDOUT){
+            ret = SCK_ERRTIMEOUT;
+            printf("sckServer_rcv() err: %d\n", ret);
+            return ret;
+        }
+
+        return ret;
+    }
+    int netdatalen = 0;
+    ret = readn(connfd, &netdatalen, 4);
+    if(ret == -1 ){
+        printf("func sckServer_rcv() err: %d\n", ret);
+        return ret;
+    }else if(ret < 4){
+        ret = SCK_ERRPEERCLOSED;
+        printf("func sckServer_rcv() err: %d\n", ret);
+        return ret;
+    }
+    int n;
+    n = ntohl(netdatalen);
+    ret = readn(connfd, out, n);
+    if(ret == -1 ){
+        printf("func sckServer_rcv() err: %d\n", ret);
+        return ret;
+    }else if(ret < 4){
+        ret = SCK_ERRPEERCLOSED;
+        printf("func sckServer_rcv() err: %d\n", ret);
+        return ret;
+    }
+    *outlen = n;
 
     return 0;
 }

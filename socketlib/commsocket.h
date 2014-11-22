@@ -42,7 +42,7 @@ int sckClient_closeConn(int conn);
 int sckClient_destroy(void *handle);
 
 
-int sckServer_init(int *listenfd);
+int sckServer_init(int *listenfd, int port);
 int sckServer_accept(int listenfd, int *connfd, int timeout);
 int sckServer_send(int connfd, unsigned char *data, int datalen, int timeout);
 int sckServer_rcv(int connfd, unsigned char *out, int *outlen, int timeout);

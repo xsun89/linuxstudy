@@ -12,15 +12,18 @@ extern 'C'
 #define SCK_ERRPEERCLOSED      (SCK_BASEERR+3)
 #define SCK_ERRMALLOC          (SCK_BASEERR+4)
 
-int sckClient_init(void **handle, int connTime, int sendTime, int recvTime);
-
-int sckClient_connect(void **handle);
-
+int sckClient_init(void **handle, int connTime, int sendTime, int recvTime, int connNumber);
+int sckClient_connect(void *handle, const char *addr, int port);
 int sckClient_send(void *handle, unsigned char *data, int datalen);
-
 int sckClient_rcv(void *handle, unsigned char *out, int *outlen);
-
+int sckClient_closeConn(int conn);
 int sckClient_destroy(void *handle);
+
+
+int sckServer_init(int *listenfd);
+int sckServer_accept(int listenfd, int *connfd, int timeout);
+int sckClient_send(int connfd, unsigned char *data, int datalen, int timeout);
+int sckClient_rcv(int connfd, unsigned char *out, int *outlen, int timeout);
 
 #ifdef __cplusplus
 }

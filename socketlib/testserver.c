@@ -43,13 +43,13 @@ int main()
 			while(1){
 				memset(recvbuf, 0, sizeof(recvbuf));
 				ret = sckServer_rcv(connfd, recvbuf, &recvbuflen, 10);
-				if (ret != 0) {
+				if (ret < 0) {
 					printf("testserver func sckServer_recv() err:%d\n", ret);
                     break;
                 }
 				printf("received buf=%s\n", recvbuf);
                 ret = sckServer_send(connfd, recvbuf, recvbuflen, 10);
-                if (ret != 0) {
+                if (ret < 0) {
                     printf("testserver func sckServer_send() err:%d\n", ret);
                     break;
                 }

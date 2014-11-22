@@ -72,7 +72,6 @@ int read_timeout(int fd, unsigned int wait_seconds)
 int write_timeout(int fd, unsigned int wait_seconds)
 {
     int ret = 0;
-    printf("debug fd=%d, wait_seconds=%d\n", fd, wait_seconds);
     if(wait_seconds > 0)
     {
         fd_set write_fdset;
@@ -84,7 +83,7 @@ int write_timeout(int fd, unsigned int wait_seconds)
         timeout.tv_usec = 0;
 
         do{
-            ret = select(fd+1, &write_fdset, NULL, NULL, &timeout);
+            ret = select(fd+1, NULL, &write_fdset, NULL, &timeout);
         }while(ret < 0 && errno == EINTR);
 
         if(ret == 0){

@@ -72,6 +72,7 @@ int read_timeout(int fd, unsigned int wait_seconds)
 int write_timeout(int fd, unsigned int wait_seconds)
 {
     int ret = 0;
+    printf("debug fd=%d, wait_seconds=%d\n", fd, wait_seconds);
     if(wait_seconds > 0)
     {
         fd_set write_fdset;

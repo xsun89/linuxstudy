@@ -1,4 +1,4 @@
-#include <unstd.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <sys/select.h>
@@ -12,12 +12,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
-#include <sys/errno.h>
-#include <sys/_endian.h>
-#include <IMServicePlugIn/IMServicePlugIn.h>
-#include <GSS/GSS.h>
-#include <Foundation/Foundation.h>
-#include <IOKit/IODataQueueClient.h>
+#include <Python/Python.h>
 #include "commsocket.h"
 
 typedef struct _SckHandle
@@ -64,11 +59,11 @@ int read_timeout(int fd, unsigned int wait_seconds)
 
         do{
             ret = select(fd+1, &read_fdset, NULL, NULL, &timeout);
-        }while(ret < 0 && errno == EINRT);
+        }while(ret < 0 && errno == EINTR);
 
         if(ret == 0){
             ret = -1;
-            errno = ETIMEOUT;
+            errno = ETIMEDOUT;
         }else if(ret == 1){
             ret = 0;
         }
@@ -90,11 +85,11 @@ int write_timeout(int fd, unsigned int wait_seconds)
 
         do{
             ret = select(fd+1, &write_fdset, NULL, NULL, &timeout);
-        }while(ret < 0 && errno == EINRT);
+        }while(ret < 0 && errno == EINTR);
 
         if(ret == 0){
             ret = -1;
-            errno = ETIMEOUT;
+            errno = ETIMEDOUT;
         }else if(ret == 1){
             ret = 0;
         }
@@ -102,7 +97,7 @@ int write_timeout(int fd, unsigned int wait_seconds)
     return ret;
 }
 
-int connect_timeout(int fd, struct scokaddr_in *addr, unsigned int wait_seconds)
+int connect_timeout(int fd, struct sockaddr *addr, unsigned int wait_seconds)
 {
     int ret = 0;
     socklen_t addrlen = sizeof(struct sockaddr_in);
@@ -200,7 +195,7 @@ ssize_t recv_peek(int sockfd, void *buf, size_t len)
 {
     while(1)
     {
-        int ret = recv(sockfd, buf, MSG_PEEK);
+        int ret = recv(sockfd, buf, len, MSG_PEEK);
         if(ret == -1 && errno == EINTR){
             continue;
         }
@@ -247,9 +242,9 @@ ssize_t readline(int sockfd, void *buf, size_t maxline)
 
     return -1;
 }
-int sckClient_init(void **handle, int connTime, int sendTime, int recvTime)
+int sckClient_init(void **handle, int connTime, int sendTime, int recvTime, int connNumber)
 {
-    int ret;
+    int ret = 0;
     if(handle == NULL || connTime < 0 || sendTime < 0 || recvTime < 0 )
     {
         ret = SCK_ERRPARM;
@@ -297,7 +292,7 @@ int sckClient_connect(void *handle, const char *ip, int port)
     servaddr.sin_port = htons(port);
     servaddr.sin_addr.s_addr = inet_addr(ip);
 
-    ret = connect_timeout(tmp->sockfd, servaddr, tmp->conntime)
+    ret = connect_timeout(tmp->sockfd, (struct sockaddr *)&servaddr, tmp->conntime);
     if(ret < 0)
     {
         if(ret == -1 && errno == ETIMEDOUT) {
@@ -352,7 +347,7 @@ int sckClient_send(void *handle, unsigned char *data, int datalen)
         return ret;
     }
 
-
+    return ret;
 }
 
 int sckClient_rcv(void *handle, unsigned char *out, int *outlen)

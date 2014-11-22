@@ -5,11 +5,10 @@ BIN=testclient testserver
 all:$(BIN)
 %.o:%.c
 	$(CC) $(CFLAGS) -c $< -o $@
-
 testclient:testclient.o commsocket.o
-    $(CC) $(CFLAGS) $^ -o $@
-testserver:testserver.o commcocket.o
-    $(CC) $(CFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $^ -o $@
+testserver:testserver.o commsocket.o
+	$(CC) $(CFLAGS) $^ -o $@
 clean:
 	rm -f *.o $(BIN)
 

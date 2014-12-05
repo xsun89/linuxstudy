@@ -1,7 +1,7 @@
 .PHONY:all clean
 CC=gcc
 CFLAGS=-Wall -g
-BIN=p2psrv p2pclt
+BIN=demo01 01msg echo_cli echo_srv
 all:$(BIN)
 %.o:%.c
 	$(CC) $(CFLAG) -c $< -o $@
